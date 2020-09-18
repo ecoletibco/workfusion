@@ -1,0 +1,47 @@
+{
+  "name": "flogo-workfusion",
+  "type": "flogo:activity",
+  "version": "0.0.1",
+  "title": "WorkFusion Copy and Run",
+  "description": "Copies and runs a WorkFusion business process",
+  "homepage": "https://github.com/ecoletibco/workfusion",
+  "settings": [
+    {
+      "name": "url",
+      "type": "string",
+      "required": true,
+      "description" : "The URL of the service to invoke"
+    },
+    {
+      "name": "username",
+      "type": "string",
+      "required": true,
+      "description" : "The username used to connect to the WorkFusion API"
+    },
+    {
+      "name": "password",
+      "type": "string",
+      "required": true,
+      "description" : "The password used to connect to the WorkFusion API"
+    }
+  ],
+  "input": [
+    {
+      "name": "uuid",
+      "type": "string",
+      "description" : "The UUID of the business process to copy and run"
+    }
+  ],
+  "output": [
+    {
+      "name": "uuid",
+      "type": "string",
+      "description" : "The UUID of the new business process"
+    },
+    {
+      "name": "data",
+      "type": "any",
+      "description" : "The final results data"
+    }
+  ]
+}
