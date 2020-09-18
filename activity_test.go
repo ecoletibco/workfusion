@@ -10,6 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	BaseUrl  = "https://wf-tibpoc-984-wfaw-10049-workfusion-lb1.workfusion.com/workfusion/api"
+	Username = ""
+	Password = ""
+	BPId     = "4eb1e6e5-f722-45e9-af49-e5380cf14003"
+)
+
 func TestRegister(t *testing.T) {
 
 	ref := activity.GetRef(&Activity{})
@@ -19,35 +26,81 @@ func TestRegister(t *testing.T) {
 }
 
 func TestSettings(t *testing.T) {
-	settings := &Settings{Method: "POS", Uri: "http://petstore.swagger.io/v2/pet"}
+
+	// valid settings
+	settings := &Settings{
+		URL:      BaseUrl,
+		Username: Username,
+		Password: Password,
+	}
 
 	iCtx := test.NewActivityInitContext(settings, nil)
 	_, err := New(iCtx)
-	assert.NotNil(t, err)
-
-	settings = &Settings{Method: "POST", Uri: ""}
-
-	iCtx = test.NewActivityInitContext(settings, nil)
-	_, err = New(iCtx)
-	assert.NotNil(t, err)
-
-	settings = &Settings{Method: "pOsT", Uri: "http://petstore.swagger.io/v2/pet"}
-
-	iCtx = test.NewActivityInitContext(settings, nil)
-	_, err = New(iCtx)
 	assert.Nil(t, err)
+
+	// No URL
+	settings = &Settings{
+		URL:      "",
+		Username: Username,
+		Password: Password,
+	}
+
+	iCtx = test.NewActivityInitContext(settings, nil)
+	_, err = New(iCtx)
+	assert.NotNil(t, err)
+
+	// Bad URL
+	settings = &Settings{
+		URL:      "https://tibco.com",
+		Username: Username,
+		Password: Password,
+	}
+
+	iCtx = test.NewActivityInitContext(settings, nil)
+	_, err = New(iCtx)
+	assert.NotNil(t, err)
+
+	// No user
+	settings = &Settings{
+		URL:      BaseUrl,
+		Username: "",
+		Password: "BadPassword",
+	}
+
+	iCtx = test.NewActivityInitContext(settings, nil)
+	_, err = New(iCtx)
+	assert.NotNil(t, err)
+
+	// No password
+	settings = &Settings{
+		URL:      BaseUrl,
+		Username: Username,
+		Password: "",
+	}
+
+	iCtx = test.NewActivityInitContext(settings, nil)
+	_, err = New(iCtx)
+	assert.NotNil(t, err)
+
+	// Bad creds
+	settings = &Settings{
+		URL:      BaseUrl,
+		Username: "BadUsername",
+		Password: "BadPassword",
+	}
+
+	iCtx = test.NewActivityInitContext(settings, nil)
+	_, err = New(iCtx)
+	assert.NotNil(t, err)
 }
 
-const reqPostStr string = `{
-  "name": "my pet"
-}
-`
+func TestEvalSuccess(t *testing.T) {
 
-var petID string
-
-func TestSimplePost(t *testing.T) {
-
-	settings := &Settings{Method: "POST", Uri: "http://petstore.swagger.io/v2/pet"}
+	settings := &Settings{
+		URL:      BaseUrl,
+		Username: Username,
+		Password: Password,
+	}
 
 	mf := mapper.NewFactory(resolve.GetBasicResolver())
 	iCtx := test.NewActivityInitContext(settings, mf)
@@ -57,17 +110,21 @@ func TestSimplePost(t *testing.T) {
 	tc := test.NewActivityContext(act.Metadata())
 
 	//setup attrs
-	tc.SetInput("content", reqPostStr)
+	tc.SetInput("uuid", BPId)
 
 	//eval
 	act.Eval(tc)
+	assert.NotNil(t, tc.GetOutput("uuid"))
 	assert.NotNil(t, tc.GetOutput("data"))
-
 }
 
-func TestSimpleGet(t *testing.T) {
+func TestEvalBadBPId(t *testing.T) {
 
-	settings := &Settings{Method: "GET", Uri: "http://petstore.swagger.io/v2/pet/16"}
+	settings := &Settings{
+		URL:      BaseUrl,
+		Username: Username,
+		Password: Password,
+	}
 
 	mf := mapper.NewFactory(resolve.GetBasicResolver())
 	iCtx := test.NewActivityInitContext(settings, mf)
@@ -76,152 +133,11 @@ func TestSimpleGet(t *testing.T) {
 
 	tc := test.NewActivityContext(act.Metadata())
 
+	//setup attrs
+	tc.SetInput("uuid", "bad1e6e5-f722-45e9-af49-e5380cf14003")
+
 	//eval
 	act.Eval(tc)
-
+	assert.NotNil(t, tc.GetOutput("uuid"))
 	assert.NotNil(t, tc.GetOutput("data"))
-
-}
-
-func TestSimpleGetWithHeaders(t *testing.T) {
-
-	settings := &Settings{Method: "GET", Uri: "http://petstore.swagger.io/v2/pet/1"}
-
-	mf := mapper.NewFactory(resolve.GetBasicResolver())
-	iCtx := test.NewActivityInitContext(settings, mf)
-	act, err := New(iCtx)
-	assert.Nil(t, err)
-
-	tc := test.NewActivityContext(act.Metadata())
-
-	headers := make(map[string]string)
-	headers["TestHeader"] = "TestValue"
-	tc.SetInput("headers", headers)
-
-	//eval
-	act.Eval(tc)
-
-	output := &Output{}
-	tc.GetOutputObject(output)
-	assert.NotNil(t, output.Status)
-
-}
-
-func TestParamGet(t *testing.T) {
-
-	settings := &Settings{Method: "GET", Uri: "http://petstore.swagger.io/v2/pet/:id"}
-
-	mf := mapper.NewFactory(resolve.GetBasicResolver())
-	iCtx := test.NewActivityInitContext(settings, mf)
-	act, err := New(iCtx)
-	assert.Nil(t, err)
-
-	tc := test.NewActivityContext(act.Metadata())
-
-	pathParams := map[string]string{
-		"id": petID,
-	}
-	tc.SetInput("pathParams", pathParams)
-
-	//eval
-	act.Eval(tc)
-
-	assert.NotNil(t, tc.GetOutput("data"))
-
-}
-
-//func TestSimpleGetWithProxy(t *testing.T) {
-//
-//	settings := &Settings{Method:"GET", Uri:"http://petstore.swagger.io/v2/pet/1"}
-//	settings.Proxy = "http://localhost:12345"
-//
-//	mf := mapper.NewFactory(resolve.GetBasicResolver())
-//	iCtx := test.NewActivityInitContext(settings, mf)
-//	act, err := New(iCtx)
-//	assert.Nil(t, err)
-//
-//	tc := test.NewActivityContext(act.Metadata())
-//
-//	//eval
-//	_, err = act.Eval(tc)
-//	if err != nil {
-//		fmt.Printf("error: %v\n", err)
-//	}
-//	val := tc.GetOutput("result")
-//	fmt.Printf("result: %v\n", val)
-//}
-
-func TestSimpleGetQP(t *testing.T) {
-
-	settings := &Settings{Method: "GET", Uri: "http://petstore.swagger.io/v2/pet/findByStatus"}
-
-	mf := mapper.NewFactory(resolve.GetBasicResolver())
-	iCtx := test.NewActivityInitContext(settings, mf)
-	act, err := New(iCtx)
-	assert.Nil(t, err)
-
-	tc := test.NewActivityContext(act.Metadata())
-
-	queryParams := map[string]string{
-		"status": "ava",
-	}
-	tc.SetInput("queryParams", queryParams)
-
-	//eval
-	act.Eval(tc)
-
-	assert.NotNil(t, tc.GetOutput("data"))
-}
-
-func TestBuildURI(t *testing.T) {
-
-	uri := "http://localhost:7070/flow/:id"
-
-	params := map[string]string{
-		"id": "1234",
-	}
-
-	newURI := BuildURI(uri, params)
-
-	assert.NotNil(t, newURI)
-}
-
-func TestBuildURI2(t *testing.T) {
-
-	uri := "https://127.0.0.1:7070/:cmd/:id/test"
-
-	params := map[string]string{
-		"cmd": "flow",
-		"id":  "1234",
-	}
-
-	newURI := BuildURI(uri, params)
-	assert.NotNil(t, newURI)
-}
-
-func TestBuildURI3(t *testing.T) {
-
-	uri := "http://localhost/flow/:id"
-
-	params := map[string]string{
-		"id": "1234",
-	}
-
-	newURI := BuildURI(uri, params)
-
-	assert.NotNil(t, newURI)
-}
-
-func TestBuildURI4(t *testing.T) {
-
-	uri := "https://127.0.0.1/:cmd/:id/test"
-
-	params := map[string]string{
-		"cmd": "flow",
-		"id":  "1234",
-	}
-
-	newURI := BuildURI(uri, params)
-
-	assert.NotNil(t, newURI)
 }

@@ -51,17 +51,17 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 
 	act := &Activity{settings: s}
 
-	var err error
-	act.client, err = getHttpClient(10)
+	client, err := getHttpClient(10)
 	if err != nil {
 		return nil, err
 	}
+	act.client = &client
 
-	authTokens, err = connectToWF(client, s.URL, s.Username, s.Password)
+	authTokens, err := connectToWF(client, s.URL, s.Username, s.Password)
 	if err != nil {
-		// replace password in error!!!!!
 		return nil, err
 	}
+	act.authTokens = authTokens
 
 	return act, nil
 }
@@ -79,18 +79,61 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 		return false, err
 	}
 
-	baseUrl := a.settings.URL
-
 	logger := ctx.Logger()
 	if logger.DebugEnabled() {
 		logger.Debugf("WorkFusion Copy and Run: %s", input.UUID)
+	}
+
+	client := *a.client
+	baseUrl := a.settings.URL
+	authTokens := a.authTokens
+
+	if logger.DebugEnabled() {
+		logger.Debugf("Copying BP...")
+	}
+	newBPId, err := copyBP(client, baseUrl, authTokens, "4eb1e6e5-f722-45e9-af49-e5380cf14003")
+	if err != nil {
+		fmt.Println("Error in copyBP: " + err.Error())
+		return
+	}
+
+	if logger.DebugEnabled() {
+		logger.Debugf("Running BP...")
+	}
+	runId, err := runBP(client, baseUrl, authTokens, newBPId)
+	if err != nil {
+		fmt.Println("Error in runBP: " + err.Error())
+		return
+	}
+
+	complete := false
+	for complete == false {
+
+		if logger.DebugEnabled() {
+			logger.Debugf("Waiting for it to complete...")
+		}
+		complete, err = checkRunStatus(client, baseUrl, authTokens, runId)
+		if err != nil {
+			fmt.Println("Error in runBP: " + err.Error())
+			return
+		}
+		time.Sleep(5 * time.Second)
+	}
+
+	if logger.DebugEnabled() {
+		logger.Debugf("Fetching Results...")
+	}
+	result, err := fetchResults(client, baseUrl, authTokens, runId)
+	if err != nil {
+		fmt.Println("Error in runBP: " + err.Error())
+		return
 	}
 
 	if logger.TraceEnabled() {
 		logger.Trace("Response body:", result)
 	}
 
-	output := &Output{Status: resp.StatusCode, Data: result, Headers: respHeaders, Cookies: cookies}
+	output := &Output{UUID: newBPId, Data: result}
 	err = ctx.SetOutputObject(output)
 	if err != nil {
 		return false, err
@@ -198,7 +241,8 @@ func connectToWF(client http.Client, baseUrl string, username string, password s
 
 	resp, err := getRestResponse(client, MethodPOST, uri, headers, nil)
 	if err != nil {
-		return authTokens, err
+		// err may contain creds, DO NOT return
+		return authTokens, errors.New("Login failed")
 	}
 
 	response, err := getBodyAsJSON(resp.Body)
@@ -237,6 +281,16 @@ func connectToWF(client http.Client, baseUrl string, username string, password s
 	}
 
 	return authTokens, nil
+}
+
+type CopyBPRequest struct {
+	DataCopy                  bool   `json:"dataCopy"`
+	DeepCopy                  bool   `json:"deepCopy"`
+	DeepCopySuffix            string `json:"deepCopySuffix"`
+	IndependentDefinition     bool   `json:"independentDefinition"`
+	IndependentDefinitionName string `json:"independentDefinitionName"`
+	InstanceUUID              string `json:"instanceUUID"`
+	ProcessCopy               bool   `json:"processCopy"`
 }
 
 func copyBP(client http.Client, baseUrl string, authTokens AuthTokens, UUID string) (string, error) {

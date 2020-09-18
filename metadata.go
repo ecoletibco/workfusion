@@ -23,7 +23,7 @@ func (i *Input) ToMap() map[string]interface{} {
 func (i *Input) FromMap(values map[string]interface{}) error {
 
 	var err error
-	i.UUID, err = coerce.ToParams(values["uuid"])
+	i.UUID, err = coerce.ToString(values["uuid"])
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,7 @@ func (o *Output) ToMap() map[string]interface{} {
 func (o *Output) FromMap(values map[string]interface{}) error {
 
 	var err error
-	o.UUID, err = coerce.ToInt(values["uuid"])
+	o.UUID, err = coerce.ToString(values["uuid"])
 	if err != nil {
 		return err
 	}
